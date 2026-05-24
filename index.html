@@ -1,0 +1,882 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font-sans,system-ui);background:var(--color-background-tertiary,#f5f5f2);color:var(--color-text-primary,#1a1a1a);font-size:13px;overflow-x:hidden}
+.app{display:grid;grid-template-rows:48px 1fr;height:100vh;min-height:600px}
+.topbar{background:var(--color-background-primary,#fff);border-bottom:0.5px solid var(--color-border-tertiary,rgba(0,0,0,.12));display:flex;align-items:center;padding:0 16px;gap:12px;z-index:10}
+.topbar-title{font-size:14px;font-weight:500;flex:1}
+.status-dot{width:8px;height:8px;border-radius:50%;background:#e24b4a;flex-shrink:0}
+.status-dot.connected{background:#639922}
+.status-text{font-size:12px;color:var(--color-text-secondary,#666)}
+.btn{padding:5px 12px;border-radius:var(--border-radius-md,8px);border:0.5px solid var(--color-border-secondary,rgba(0,0,0,.25));background:transparent;color:var(--color-text-primary,#1a1a1a);cursor:pointer;font-size:12px;font-family:inherit;display:flex;align-items:center;gap:5px;transition:background .15s}
+.btn:hover{background:var(--color-background-secondary,#f0ede8)}
+.btn.active{background:var(--color-background-info,#e6f1fb);border-color:var(--color-border-info,rgba(24,95,165,.4));color:var(--color-text-info,#185fa5)}
+.btn.danger{background:var(--color-background-danger,#fcebeb);border-color:var(--color-border-danger,rgba(163,45,45,.4));color:var(--color-text-danger,#a32d2d)}
+.btn.success{background:var(--color-background-success,#eaf3de);border-color:var(--color-border-success,rgba(59,109,17,.4));color:var(--color-text-success,#3b6d11)}
+select{padding:5px 8px;border-radius:var(--border-radius-md,8px);border:0.5px solid var(--color-border-secondary,rgba(0,0,0,.25));background:var(--color-background-primary,#fff);color:var(--color-text-primary,#1a1a1a);font-size:12px;font-family:inherit;cursor:pointer}
+.main{display:grid;grid-template-columns:220px 1fr 280px;gap:0;overflow:hidden}
+.sidebar{background:var(--color-background-primary,#fff);border-right:0.5px solid var(--color-border-tertiary,rgba(0,0,0,.12));display:flex;flex-direction:column;overflow-y:auto}
+.center{display:flex;flex-direction:column;gap:0;overflow:hidden}
+.rightpanel{background:var(--color-background-primary,#fff);border-left:0.5px solid var(--color-border-tertiary,rgba(0,0,0,.12));display:flex;flex-direction:column;overflow-y:auto}
+.section{padding:12px;border-bottom:0.5px solid var(--color-border-tertiary,rgba(0,0,0,.12))}
+.section-title{font-size:11px;font-weight:500;color:var(--color-text-secondary,#666);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px}
+.metric-row{display:flex;justify-content:space-between;align-items:center;padding:4px 0}
+.metric-label{font-size:12px;color:var(--color-text-secondary,#666)}
+.metric-val{font-size:13px;font-weight:500;font-family:var(--font-mono,monospace)}
+.metric-val.ax{color:#378add}
+.metric-val.ay{color:#1d9e75}
+.metric-val.az{color:#d85a30}
+.metric-val.gx{color:#7f77dd}
+.metric-val.gy{color:#d4537e}
+.metric-val.gz{color:#ba7517}
+.cube-container{background:var(--color-background-secondary,#f5f5f2);display:flex;align-items:center;justify-content:center;height:180px;position:relative}
+canvas.cube-canvas{display:block}
+.osc-area{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.osc-row{flex:1;position:relative;border-bottom:0.5px solid var(--color-border-tertiary,rgba(0,0,0,.12));min-height:60px}
+.osc-label{position:absolute;top:4px;left:8px;font-size:10px;font-weight:500;z-index:2;opacity:.8}
+.osc-canvas{width:100%;height:100%;display:block}
+.tab-bar{display:flex;background:var(--color-background-primary,#fff);border-bottom:0.5px solid var(--color-border-tertiary,rgba(0,0,0,.12));}
+.tab{padding:10px 16px;font-size:12px;cursor:pointer;border-bottom:2px solid transparent;color:var(--color-text-secondary,#666);transition:color .15s}
+.tab.active{color:var(--color-text-info,#185fa5);border-bottom-color:#185fa5}
+.bar-row{display:flex;align-items:center;gap:8px;margin:3px 0}
+.bar-bg{flex:1;height:6px;background:var(--color-background-secondary,#f0ede8);border-radius:3px;overflow:hidden}
+.bar-fill{height:100%;border-radius:3px;transition:width .1s}
+.calib-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.calib-item{background:var(--color-background-secondary,#f5f5f2);border-radius:var(--border-radius-md,8px);padding:8px;text-align:center}
+.calib-item .cv{font-size:15px;font-weight:500;font-family:var(--font-mono,monospace)}
+.calib-item .cl{font-size:10px;color:var(--color-text-secondary,#666);margin-top:2px}
+.record-indicator{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--color-text-danger,#a32d2d)}
+.record-dot{width:6px;height:6px;border-radius:50%;background:#e24b4a;animation:blink 1s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
+.replay-bar{display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--color-background-secondary,#f5f5f2);border-bottom:0.5px solid var(--color-border-tertiary,rgba(0,0,0,.12))}
+.replay-slider{flex:1;height:3px;-webkit-appearance:none;border-radius:2px;background:var(--color-border-tertiary,rgba(0,0,0,.12));outline:none;cursor:pointer}
+.replay-slider::-webkit-slider-thumb{-webkit-appearance:none;width:12px;height:12px;border-radius:50%;background:#185fa5;cursor:pointer}
+.alert-badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:500}
+.alert-ok{background:var(--color-background-success,#eaf3de);color:var(--color-text-success,#3b6d11)}
+.alert-warn{background:var(--color-background-warning,#faeeda);color:var(--color-text-warning,#854f0b)}
+.alert-danger{background:var(--color-background-danger,#fcebeb);color:var(--color-text-danger,#a32d2d)}
+.input-row{display:flex;align-items:center;gap:6px;margin:4px 0}
+.input-row label{font-size:11px;color:var(--color-text-secondary,#666);width:70px;flex-shrink:0}
+.input-row input{flex:1;padding:4px 8px;border-radius:6px;border:0.5px solid var(--color-border-secondary,rgba(0,0,0,.25));background:var(--color-background-primary,#fff);color:var(--color-text-primary,#1a1a1a);font-size:12px;font-family:var(--font-mono,monospace)}
+.export-row{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+.seismic-bar{height:3px;border-radius:2px;background:var(--color-border-tertiary,rgba(0,0,0,.1));overflow:hidden;margin-top:4px}
+.seismic-fill{height:100%;border-radius:2px;transition:width .2s,background .2s}
+.phase-tag{font-size:10px;font-weight:500;padding:1px 6px;border-radius:4px}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="topbar">
+    <div class="status-dot" id="statusDot"></div>
+    <span class="topbar-title">IMU Telemetry Dashboard — MPU6050</span>
+    <span class="status-text" id="statusText">Disconnected</span>
+    <select id="sourceSelect" onchange="handleSourceChange()">
+      <option value="sim">Simulation</option>
+      <option value="serial">Serial port</option>
+      <option value="ble">Bluetooth (BLE)</option>
+    </select>
+    <select id="portSelect" style="display:none">
+      <option>Select port…</option>
+    </select>
+    <button class="btn" id="connectBtn" onclick="toggleConnect()">Connect</button>
+    <button class="btn" id="recordBtn" onclick="toggleRecord()"><i class="ti ti-player-record" aria-hidden="true"></i> Record</button>
+    <button class="btn" id="exportBtn" onclick="exportData()"><i class="ti ti-download" aria-hidden="true"></i> Export CSV</button>
+    <div id="recIndicator" style="display:none" class="record-indicator"><div class="record-dot"></div>REC <span id="recTime">0s</span></div>
+  </div>
+  <div class="main">
+
+    <div class="sidebar">
+      <div class="section">
+        <div class="section-title">Live values</div>
+        <div class="metric-row"><span class="metric-label">ax (g)</span><span class="metric-val ax" id="v_ax">0.000</span></div>
+        <div class="metric-row"><span class="metric-label">ay (g)</span><span class="metric-val ay" id="v_ay">0.000</span></div>
+        <div class="metric-row"><span class="metric-label">az (g)</span><span class="metric-val az" id="v_az">1.000</span></div>
+        <div class="metric-row"><span class="metric-label">gx (°/s)</span><span class="metric-val gx" id="v_gx">0.000</span></div>
+        <div class="metric-row"><span class="metric-label">gy (°/s)</span><span class="metric-val gy" id="v_gy">0.000</span></div>
+        <div class="metric-row"><span class="metric-label">gz (°/s)</span><span class="metric-val gz" id="v_gz">0.000</span></div>
+        <div style="margin-top:8px;border-top:0.5px solid var(--color-border-tertiary,rgba(0,0,0,.1));padding-top:8px">
+          <div class="metric-row"><span class="metric-label">|a| (g)</span><span class="metric-val" id="v_mag">1.000</span></div>
+          <div class="metric-row"><span class="metric-label">Temp (°C)</span><span class="metric-val" id="v_temp">25.0</span></div>
+          <div class="metric-row"><span class="metric-label">Sample/s</span><span class="metric-val" id="v_rate">100</span></div>
+          <div class="metric-row"><span class="metric-label">Uptime</span><span class="metric-val" id="v_uptime">0s</span></div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-title">Detection</div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+          <span style="font-size:12px">Seismic</span>
+          <span class="alert-badge alert-ok" id="seismicBadge">OK</span>
+        </div>
+        <div class="seismic-bar"><div class="seismic-fill" id="seismicFill" style="width:0%;background:#639922"></div></div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-top:8px;margin-bottom:4px">
+          <span style="font-size:12px">Phase</span>
+          <span class="phase-tag" id="phaseBadge" style="background:var(--color-background-secondary);color:var(--color-text-secondary)">—</span>
+        </div>
+        <div style="margin-top:8px">
+          <div class="metric-row"><span class="metric-label">PGA (g)</span><span class="metric-val" id="v_pga">0.000</span></div>
+          <div class="metric-row"><span class="metric-label">Alert level</span><span class="metric-val" id="v_alert">None</span></div>
+        </div>
+      </div>
+
+      <div class="section" style="flex:1">
+        <div class="section-title">G-force bars</div>
+        <div class="bar-row"><span style="width:22px;font-size:11px;color:#378add">ax</span><div class="bar-bg"><div class="bar-fill" id="b_ax" style="background:#378add;width:50%"></div></div></div>
+        <div class="bar-row"><span style="width:22px;font-size:11px;color:#1d9e75">ay</span><div class="bar-bg"><div class="bar-fill" id="b_ay" style="background:#1d9e75;width:50%"></div></div></div>
+        <div class="bar-row"><span style="width:22px;font-size:11px;color:#d85a30">az</span><div class="bar-bg"><div class="bar-fill" id="b_az" style="background:#d85a30;width:75%"></div></div></div>
+        <div class="bar-row"><span style="width:22px;font-size:11px;color:#7f77dd">gx</span><div class="bar-bg"><div class="bar-fill" id="b_gx" style="background:#7f77dd;width:50%"></div></div></div>
+        <div class="bar-row"><span style="width:22px;font-size:11px;color:#d4537e">gy</span><div class="bar-bg"><div class="bar-fill" id="b_gy" style="background:#d4537e;width:50%"></div></div></div>
+        <div class="bar-row"><span style="width:22px;font-size:11px;color:#ba7517">gz</span><div class="bar-bg"><div class="bar-fill" id="b_gz" style="background:#ba7517;width:50%"></div></div></div>
+        <div style="display:flex;justify-content:space-between;margin-top:4px;font-size:10px;color:var(--color-text-secondary)"><span>-2g</span><span>0</span><span>+2g</span></div>
+      </div>
+    </div>
+
+    <div class="center">
+      <div class="tab-bar">
+        <div class="tab active" id="tab-osc" onclick="switchTab('osc')">Oscilloscope</div>
+        <div class="tab" id="tab-fft" onclick="switchTab('fft')">FFT spectrum</div>
+        <div class="tab" id="tab-3d" onclick="switchTab('3d')">3D view</div>
+        <div class="tab" id="tab-replay" onclick="switchTab('replay')">Replay</div>
+      </div>
+
+      <div id="panel-osc" class="osc-area">
+        <div class="osc-row" id="osc_ax_row">
+          <div class="osc-label" style="color:#378add">ax</div>
+          <canvas class="osc-canvas" id="osc_ax"></canvas>
+        </div>
+        <div class="osc-row" id="osc_ay_row">
+          <div class="osc-label" style="color:#1d9e75">ay</div>
+          <canvas class="osc-canvas" id="osc_ay"></canvas>
+        </div>
+        <div class="osc-row" id="osc_az_row">
+          <div class="osc-label" style="color:#d85a30">az</div>
+          <canvas class="osc-canvas" id="osc_az"></canvas>
+        </div>
+        <div class="osc-row" id="osc_gx_row">
+          <div class="osc-label" style="color:#7f77dd">gx</div>
+          <canvas class="osc-canvas" id="osc_gx"></canvas>
+        </div>
+        <div class="osc-row" id="osc_gy_row">
+          <div class="osc-label" style="color:#d4537e">gy</div>
+          <canvas class="osc-canvas" id="osc_gy"></canvas>
+        </div>
+        <div class="osc-row" id="osc_gz_row">
+          <div class="osc-label" style="color:#ba7517">gz</div>
+          <canvas class="osc-canvas" id="osc_gz"></canvas>
+        </div>
+      </div>
+
+      <div id="panel-fft" style="display:none;flex:1;position:relative;padding:12px">
+        <canvas id="fftCanvas" style="width:100%;height:100%;display:block"></canvas>
+      </div>
+
+      <div id="panel-3d" style="display:none;flex:1;align-items:center;justify-content:center;background:var(--color-background-secondary);display:none">
+        <canvas id="cube3d" style="display:block;max-width:100%;max-height:100%"></canvas>
+      </div>
+
+      <div id="panel-replay" style="display:none;flex-direction:column;flex:1">
+        <div class="replay-bar">
+          <button class="btn" id="replayPlayBtn" onclick="toggleReplay()"><i class="ti ti-player-play" aria-hidden="true"></i></button>
+          <input type="range" class="replay-slider" id="replaySlider" min="0" max="100" value="0" oninput="seekReplay(this.value)">
+          <span style="font-size:11px;color:var(--color-text-secondary);white-space:nowrap" id="replayPos">0 / 0 samples</span>
+        </div>
+        <div style="flex:1;overflow-y:auto;padding:12px">
+          <div style="font-size:12px;color:var(--color-text-secondary);text-align:center;padding:24px" id="replayEmpty">No recording loaded. Record some data first, then switch to Replay.</div>
+          <canvas id="replayCanvas" style="width:100%;display:none"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <div class="rightpanel">
+      <div class="section">
+        <div class="section-title">3D orientation</div>
+        <div class="cube-container">
+          <canvas class="cube-canvas" id="cubeSmall" width="180" height="160"></canvas>
+        </div>
+        <div style="display:flex;justify-content:space-between;margin-top:6px">
+          <div style="text-align:center;flex:1"><div style="font-size:10px;color:var(--color-text-secondary)">Roll</div><div style="font-size:13px;font-weight:500;font-family:var(--font-mono,monospace)" id="v_roll">0.0°</div></div>
+          <div style="text-align:center;flex:1"><div style="font-size:10px;color:var(--color-text-secondary)">Pitch</div><div style="font-size:13px;font-weight:500;font-family:var(--font-mono,monospace)" id="v_pitch">0.0°</div></div>
+          <div style="text-align:center;flex:1"><div style="font-size:10px;color:var(--color-text-secondary)">Yaw</div><div style="font-size:13px;font-weight:500;font-family:var(--font-mono,monospace)" id="v_yaw">0.0°</div></div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-title">Calibration</div>
+        <div class="calib-grid">
+          <div class="calib-item"><div class="cv" id="c_ax">0.000</div><div class="cl">ax offset</div></div>
+          <div class="calib-item"><div class="cv" id="c_ay">0.000</div><div class="cl">ay offset</div></div>
+          <div class="calib-item"><div class="cv" id="c_az">0.000</div><div class="cl">az offset</div></div>
+          <div class="calib-item"><div class="cv" id="c_gx">0.000</div><div class="cl">gx offset</div></div>
+          <div class="calib-item"><div class="cv" id="c_gy">0.000</div><div class="cl">gy offset</div></div>
+          <div class="calib-item"><div class="cv" id="c_gz">0.000</div><div class="cl">gz offset</div></div>
+        </div>
+        <div style="margin-top:8px;display:flex;gap:6px">
+          <button class="btn" style="flex:1" onclick="startCalibration()"><i class="ti ti-crosshair" aria-hidden="true"></i> Calibrate</button>
+          <button class="btn" onclick="resetCalibration()"><i class="ti ti-refresh" aria-hidden="true"></i></button>
+        </div>
+        <div id="calibStatus" style="font-size:11px;color:var(--color-text-secondary);margin-top:6px;min-height:16px"></div>
+        <div style="margin-top:6px">
+          <div class="input-row"><label>ax scale</label><input type="number" id="scale_ax" value="1.0000" step="0.0001"></div>
+          <div class="input-row"><label>ay scale</label><input type="number" id="scale_ay" value="1.0000" step="0.0001"></div>
+          <div class="input-row"><label>az scale</label><input type="number" id="scale_az" value="1.0000" step="0.0001"></div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-title">Oscilloscope settings</div>
+        <div class="input-row"><label>Time window</label>
+          <select id="oscWindow" style="flex:1" onchange="updateOscWindow()">
+            <option value="100">1 s</option>
+            <option value="500" selected>5 s</option>
+            <option value="1000">10 s</option>
+            <option value="3000">30 s</option>
+          </select>
+        </div>
+        <div class="input-row"><label>Channels</label>
+          <div style="display:flex;gap:4px;flex-wrap:wrap">
+            <button class="btn active" id="ch_ax" onclick="toggleCh('ax')" style="padding:2px 6px;font-size:11px">ax</button>
+            <button class="btn active" id="ch_ay" onclick="toggleCh('ay')" style="padding:2px 6px;font-size:11px">ay</button>
+            <button class="btn active" id="ch_az" onclick="toggleCh('az')" style="padding:2px 6px;font-size:11px">az</button>
+            <button class="btn active" id="ch_gx" onclick="toggleCh('gx')" style="padding:2px 6px;font-size:11px">gx</button>
+            <button class="btn active" id="ch_gy" onclick="toggleCh('gy')" style="padding:2px 6px;font-size:11px">gy</button>
+            <button class="btn active" id="ch_gz" onclick="toggleCh('gz')" style="padding:2px 6px;font-size:11px">gz</button>
+          </div>
+        </div>
+        <div class="input-row"><label>Trigger</label>
+          <select id="triggerSel" style="flex:1">
+            <option value="none">Free run</option>
+            <option value="ax">ax rising</option>
+            <option value="az">az threshold</option>
+            <option value="mag">|a| > 1.2g</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-title">Export &amp; data</div>
+        <div class="export-row">
+          <button class="btn" onclick="exportData()"><i class="ti ti-file-type-csv" aria-hidden="true"></i> CSV</button>
+          <button class="btn" onclick="exportJSON()"><i class="ti ti-braces" aria-hidden="true"></i> JSON</button>
+          <button class="btn" onclick="clearRecording()"><i class="ti ti-trash" aria-hidden="true"></i> Clear</button>
+        </div>
+        <div style="margin-top:8px;font-size:11px;color:var(--color-text-secondary)" id="exportInfo">No recording</div>
+      </div>
+
+      <div class="section" style="flex:1">
+        <div class="section-title">Statistics</div>
+        <div class="metric-row"><span class="metric-label">ax RMS</span><span class="metric-val" id="s_ax_rms">—</span></div>
+        <div class="metric-row"><span class="metric-label">ay RMS</span><span class="metric-val" id="s_ay_rms">—</span></div>
+        <div class="metric-row"><span class="metric-label">az RMS</span><span class="metric-val" id="s_az_rms">—</span></div>
+        <div class="metric-row"><span class="metric-label">Peak ax</span><span class="metric-val" id="s_ax_pk">—</span></div>
+        <div class="metric-row"><span class="metric-label">Peak az</span><span class="metric-val" id="s_az_pk">—</span></div>
+        <div class="metric-row"><span class="metric-label">Samples rec.</span><span class="metric-val" id="s_recn">0</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const isDark = matchMedia('(prefers-color-scheme: dark)').matches;
+const GRID_COLOR = isDark ? 'rgba(255,255,255,.06)' : 'rgba(0,0,0,.06)';
+const TEXT_COLOR = isDark ? 'rgba(255,255,255,.45)' : 'rgba(0,0,0,.4)';
+const ZERO_COLOR = isDark ? 'rgba(255,255,255,.12)' : 'rgba(0,0,0,.12)';
+
+const CHANNELS = {
+  ax:{color:'#378add',range:2,unit:'g'},
+  ay:{color:'#1d9e75',range:2,unit:'g'},
+  az:{color:'#d85a30',range:2,unit:'g'},
+  gx:{color:'#7f77dd',range:250,unit:'°/s'},
+  gy:{color:'#d4537e',range:250,unit:'°/s'},
+  gz:{color:'#ba7517',range:250,unit:'°/s'},
+};
+
+let OSC_WINDOW = 500;
+let CHANNELS_ACTIVE = {ax:true,ay:true,az:true,gx:true,gy:true,gz:true};
+const HISTORY_MAX = 6000;
+const history = {ax:[],ay:[],az:[],gx:[],gy:[],gz:[],t:[]};
+let recording = [];
+let isRecording = false;
+let isConnected = false;
+let recStartTime = null;
+let recTimerInterval = null;
+let simInterval = null;
+let serialReader = null;
+let bleDevice = null;
+let simT = 0;
+let calibOffsets = {ax:0,ay:0,az:0,gx:0,gy:0,gz:0};
+let calibScales = {ax:1,ay:1,az:1};
+let calibSamples = [];
+let isCalibrating = false;
+let uptimeStart = Date.now();
+let sampleCount = 0;
+let lastSampleTime = Date.now();
+let sampleRateBuffer = [];
+let replayPlaying = false;
+let replayIdx = 0;
+let replayInterval = null;
+let currentTab = 'osc';
+let cubeAngles = {x:0,y:0,z:0};
+let targetAngles = {x:0,y:0,z:0};
+
+let peakAx = 0, peakAz = 0;
+let sumAxSq=0,sumAySq=0,sumAzSq=0,statN=0;
+let pgaWindow = [];
+
+function handleSourceChange(){
+  const v = document.getElementById('sourceSelect').value;
+  document.getElementById('portSelect').style.display = v==='serial'?'block':'none';
+  if(v==='sim'&&isConnected) disconnect();
+}
+
+function toggleConnect(){
+  if(isConnected) disconnect();
+  else connect();
+}
+
+async function connect(){
+  const src = document.getElementById('sourceSelect').value;
+  if(src==='sim'){
+    startSim();
+  } else if(src==='serial'){
+    await connectSerial();
+  } else if(src==='ble'){
+    await connectBLE();
+  }
+}
+
+function disconnect(){
+  if(simInterval){clearInterval(simInterval);simInterval=null}
+  if(serialReader){try{serialReader.cancel()}catch(e){}}
+  if(bleDevice&&bleDevice.gatt&&bleDevice.gatt.connected) bleDevice.gatt.disconnect();
+  setConnected(false);
+}
+
+function setConnected(v){
+  isConnected=v;
+  document.getElementById('statusDot').className='status-dot'+(v?' connected':'');
+  document.getElementById('statusText').textContent=v?'Connected':'Disconnected';
+  document.getElementById('connectBtn').textContent=v?'Disconnect':'Connect';
+  document.getElementById('connectBtn').className='btn'+(v?' danger':'');
+}
+
+function startSim(){
+  setConnected(true);
+  simT=0;
+  simInterval=setInterval(()=>{
+    simT+=0.01;
+    const quake = simT>30&&simT<55;
+    const qScale = quake?Math.sin((simT-30)*0.5)*Math.min((simT-30)*0.1,1.0)*0.4:0;
+    const sample={
+      ax:(Math.sin(simT*2.1)*0.012+Math.random()*0.006-0.003+qScale*(Math.sin(simT*8.3)+Math.random()*.3))*calibScales.ax-calibOffsets.ax,
+      ay:(Math.cos(simT*1.7)*0.008+Math.random()*0.006-0.003+qScale*(Math.cos(simT*9.1)+Math.random()*.3))*calibScales.ay-calibOffsets.ay,
+      az:(1.0+Math.sin(simT*0.3)*0.002+Math.random()*0.003+qScale*0.3)*calibScales.az-calibOffsets.az,
+      gx:Math.sin(simT*1.1)*0.8+Math.random()*0.5-0.25+qScale*15*(Math.sin(simT*6)),
+      gy:Math.cos(simT*0.9)*0.6+Math.random()*0.5-0.25+qScale*12*(Math.cos(simT*7)),
+      gz:Math.sin(simT*0.4)*0.3+Math.random()*0.3-0.15+qScale*8,
+      temp:25+Math.sin(simT*0.01)*0.5,
+    };
+    ingestSample(sample);
+  },10);
+}
+
+async function connectSerial(){
+  if(!('serial' in navigator)){alert('Web Serial not supported in this browser. Use Chrome/Edge.');return}
+  try{
+    const port=await navigator.serial.requestPort();
+    await port.open({baudRate:115200});
+    setConnected(true);
+    const decoder=new TextDecoderStream();
+    port.readable.pipeTo(decoder.writable);
+    serialReader=decoder.readable.getReader();
+    let buf='';
+    while(true){
+      const{value,done}=await serialReader.read();
+      if(done)break;
+      buf+=value;
+      const lines=buf.split('\n');
+      buf=lines.pop();
+      for(const line of lines){
+        const parts=line.trim().split(',');
+        if(parts.length>=7){
+          ingestSample({ax:+parts[1],ay:+parts[2],az:+parts[3],gx:+parts[4],gy:+parts[5],gz:+parts[6]});
+        }
+      }
+    }
+  }catch(e){if(e.name!=='NotFoundError')alert('Serial error: '+e.message)}
+  setConnected(false);
+}
+
+async function connectBLE(){
+  if(!('bluetooth' in navigator)){alert('Web Bluetooth not supported in this browser. Use Chrome/Edge.');return}
+  try{
+    bleDevice=await navigator.bluetooth.requestDevice({
+      filters:[{namePrefix:'ESP32'},{namePrefix:'IMU'},{namePrefix:'MPU'}],
+      optionalServices:['6e400001-b5a3-f393-e0a9-e50e24dcca9e']
+    });
+    const server=await bleDevice.gatt.connect();
+    setConnected(true);
+    const service=await server.getPrimaryService('6e400001-b5a3-f393-e0a9-e50e24dcca9e');
+    const char=await service.getCharacteristic('6e400003-b5a3-f393-e0a9-e50e24dcca9e');
+    let buf='';
+    char.addEventListener('characteristicvaluechanged',e=>{
+      buf+=new TextDecoder().decode(e.target.value);
+      const lines=buf.split('\n');buf=lines.pop();
+      for(const line of lines){
+        const p=line.trim().split(',');
+        if(p.length>=7) ingestSample({ax:+p[1],ay:+p[2],az:+p[3],gx:+p[4],gy:+p[5],gz:+p[6]});
+      }
+    });
+    await char.startNotifications();
+    bleDevice.addEventListener('gattserverdisconnected',()=>setConnected(false));
+  }catch(e){if(e.name!=='NotFoundError')alert('BLE error: '+e.message)}
+}
+
+function ingestSample(s){
+  const now=Date.now();
+  sampleCount++;
+  sampleRateBuffer.push(now);
+  if(sampleRateBuffer.length>100) sampleRateBuffer.shift();
+
+  for(const k of['ax','ay','az','gx','gy','gz']){
+    history[k].push(s[k]??0);
+    if(history[k].length>HISTORY_MAX) history[k].shift();
+  }
+  history.t.push(now);
+  if(history.t.length>HISTORY_MAX) history.t.shift();
+
+  if(isRecording) recording.push({...s,t:now});
+  if(isCalibrating) calibSamples.push(s);
+
+  updateMetrics(s,now);
+  updateSeismic(s);
+  updateCubeTarget(s);
+}
+
+function updateMetrics(s,now){
+  document.getElementById('v_ax').textContent=s.ax.toFixed(4);
+  document.getElementById('v_ay').textContent=s.ay.toFixed(4);
+  document.getElementById('v_az').textContent=s.az.toFixed(4);
+  document.getElementById('v_gx').textContent=s.gx?.toFixed(3)??'—';
+  document.getElementById('v_gy').textContent=s.gy?.toFixed(3)??'—';
+  document.getElementById('v_gz').textContent=s.gz?.toFixed(3)??'—';
+  if(s.temp!=null) document.getElementById('v_temp').textContent=s.temp.toFixed(1);
+  const mag=Math.sqrt(s.ax*s.ax+s.ay*s.ay+s.az*s.az);
+  document.getElementById('v_mag').textContent=mag.toFixed(4);
+  const uptimeSec=Math.floor((now-uptimeStart)/1000);
+  document.getElementById('v_uptime').textContent=uptimeSec+'s';
+  if(sampleRateBuffer.length>10){
+    const dt=(now-sampleRateBuffer[0])/(sampleRateBuffer.length-1);
+    document.getElementById('v_rate').textContent=dt>0?Math.round(1000/dt):'—';
+  }
+  const roll=Math.atan2(s.ay,s.az)*180/Math.PI;
+  const pitch=Math.atan2(-s.ax,Math.sqrt(s.ay*s.ay+s.az*s.az))*180/Math.PI;
+  document.getElementById('v_roll').textContent=roll.toFixed(1)+'°';
+  document.getElementById('v_pitch').textContent=pitch.toFixed(1)+'°';
+  document.getElementById('v_yaw').textContent='—';
+
+  ['ax','ay','az','gx','gy','gz'].forEach(k=>{
+    const v=s[k]??0; const range=CHANNELS[k].range;
+    const pct=Math.min(100,Math.max(0,(v/range+1)/2*100));
+    document.getElementById('b_'+k).style.width=pct+'%';
+  });
+
+  sumAxSq+=s.ax*s.ax; sumAySq+=s.ay*s.ay; sumAzSq+=s.az*s.az; statN++;
+  if(Math.abs(s.ax)>Math.abs(peakAx)) peakAx=s.ax;
+  if(Math.abs(s.az)>Math.abs(peakAz)) peakAz=s.az;
+  if(statN%50===0){
+    document.getElementById('s_ax_rms').textContent=Math.sqrt(sumAxSq/statN).toFixed(4);
+    document.getElementById('s_ay_rms').textContent=Math.sqrt(sumAySq/statN).toFixed(4);
+    document.getElementById('s_az_rms').textContent=Math.sqrt(sumAzSq/statN).toFixed(4);
+    document.getElementById('s_ax_pk').textContent=peakAx.toFixed(4);
+    document.getElementById('s_az_pk').textContent=peakAz.toFixed(4);
+    document.getElementById('s_recn').textContent=recording.length;
+  }
+}
+
+function updateSeismic(s){
+  const mag=Math.sqrt(s.ax*s.ax+s.ay*s.ay+(s.az-1)*(s.az-1));
+  pgaWindow.push(mag); if(pgaWindow.length>500) pgaWindow.shift();
+  const pga=Math.max(...pgaWindow);
+  document.getElementById('v_pga').textContent=pga.toFixed(4);
+  const pct=Math.min(100,pga/0.5*100);
+  const fill=document.getElementById('seismicFill');
+  fill.style.width=pct+'%';
+  let badge=document.getElementById('seismicBadge');
+  let alertEl=document.getElementById('v_alert');
+  let phaseBadge=document.getElementById('phaseBadge');
+  if(pga<0.01){
+    badge.className='alert-badge alert-ok';badge.textContent='OK';
+    alertEl.textContent='None';fill.style.background='#639922';
+    phaseBadge.textContent='—';phaseBadge.style.background='var(--color-background-secondary)';phaseBadge.style.color='var(--color-text-secondary)';
+  }else if(pga<0.05){
+    badge.className='alert-badge alert-warn';badge.textContent='MINOR';
+    alertEl.textContent='Minor';fill.style.background='#ba7517';
+    phaseBadge.textContent='P-wave';phaseBadge.style.background='#faeeda';phaseBadge.style.color='#854f0b';
+  }else{
+    badge.className='alert-badge alert-danger';badge.textContent='ALERT';
+    alertEl.textContent='STRONG';fill.style.background='#e24b4a';
+    phaseBadge.textContent='S-wave';phaseBadge.style.background='#fcebeb';phaseBadge.style.color='#a32d2d';
+  }
+}
+
+function updateCubeTarget(s){
+  targetAngles.x=Math.atan2(s.ay,s.az);
+  targetAngles.y=Math.atan2(-s.ax,Math.sqrt(s.ay*s.ay+s.az*s.az));
+  targetAngles.z+=(s.gz??0)*0.01*Math.PI/180;
+}
+
+function toggleRecord(){
+  if(isRecording){
+    isRecording=false;
+    clearInterval(recTimerInterval);
+    document.getElementById('recordBtn').className='btn';
+    document.getElementById('recordBtn').innerHTML='<i class="ti ti-player-record" aria-hidden="true"></i> Record';
+    document.getElementById('recIndicator').style.display='none';
+    document.getElementById('exportInfo').textContent=recording.length+' samples recorded';
+    buildReplayCanvas();
+  }else{
+    isRecording=true;
+    recStartTime=Date.now();
+    document.getElementById('recordBtn').className='btn danger';
+    document.getElementById('recordBtn').innerHTML='<i class="ti ti-player-stop" aria-hidden="true"></i> Stop';
+    document.getElementById('recIndicator').style.display='flex';
+    recTimerInterval=setInterval(()=>{
+      document.getElementById('recTime').textContent=Math.floor((Date.now()-recStartTime)/1000)+'s';
+    },1000);
+  }
+}
+
+function clearRecording(){
+  recording=[];
+  document.getElementById('exportInfo').textContent='No recording';
+  document.getElementById('s_recn').textContent='0';
+  document.getElementById('replayEmpty').style.display='block';
+  document.getElementById('replayCanvas').style.display='none';
+  replayIdx=0;
+  document.getElementById('replaySlider').value=0;
+  document.getElementById('replayPos').textContent='0 / 0 samples';
+}
+
+function exportData(){
+  if(recording.length===0){alert('No recording to export.');return}
+  const header='timestamp_ms,ax,ay,az,gx,gy,gz\n';
+  const rows=recording.map(r=>`${r.t},${r.ax.toFixed(6)},${r.ay.toFixed(6)},${r.az.toFixed(6)},${(r.gx??0).toFixed(4)},${(r.gy??0).toFixed(4)},${(r.gz??0).toFixed(4)}`).join('\n');
+  download('imu_recording.csv',header+rows,'text/csv');
+}
+
+function exportJSON(){
+  if(recording.length===0){alert('No recording to export.');return}
+  download('imu_recording.json',JSON.stringify(recording,null,2),'application/json');
+}
+
+function download(name,content,type){
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([content],{type}));
+  a.download=name;a.click();
+}
+
+function startCalibration(){
+  calibSamples=[];isCalibrating=true;
+  document.getElementById('calibStatus').textContent='Hold still for 2 seconds…';
+  setTimeout(()=>{
+    isCalibrating=false;
+    if(calibSamples.length<10){document.getElementById('calibStatus').textContent='Not enough samples';return}
+    calibOffsets.ax=calibSamples.reduce((s,r)=>s+r.ax,0)/calibSamples.length;
+    calibOffsets.ay=calibSamples.reduce((s,r)=>s+r.ay,0)/calibSamples.length;
+    calibOffsets.az=calibSamples.reduce((s,r)=>s+r.az,0)/calibSamples.length-1;
+    calibOffsets.gx=calibSamples.reduce((s,r)=>s+(r.gx??0),0)/calibSamples.length;
+    calibOffsets.gy=calibSamples.reduce((s,r)=>s+(r.gy??0),0)/calibSamples.length;
+    calibOffsets.gz=calibSamples.reduce((s,r)=>s+(r.gz??0),0)/calibSamples.length;
+    document.getElementById('c_ax').textContent=calibOffsets.ax.toFixed(4);
+    document.getElementById('c_ay').textContent=calibOffsets.ay.toFixed(4);
+    document.getElementById('c_az').textContent=calibOffsets.az.toFixed(4);
+    document.getElementById('c_gx').textContent=calibOffsets.gx.toFixed(3);
+    document.getElementById('c_gy').textContent=calibOffsets.gy.toFixed(3);
+    document.getElementById('c_gz').textContent=calibOffsets.gz.toFixed(3);
+    document.getElementById('calibStatus').textContent='Calibrated from '+calibSamples.length+' samples';
+  },2000);
+}
+
+function resetCalibration(){
+  calibOffsets={ax:0,ay:0,az:0,gx:0,gy:0,gz:0};
+  calibScales={ax:1,ay:1,az:1};
+  ['ax','ay','az','gx','gy','gz'].forEach(k=>document.getElementById('c_'+k).textContent='0.000');
+  document.getElementById('calibStatus').textContent='Offsets cleared';
+}
+
+function toggleCh(ch){
+  CHANNELS_ACTIVE[ch]=!CHANNELS_ACTIVE[ch];
+  document.getElementById('ch_'+ch).className='btn'+(CHANNELS_ACTIVE[ch]?' active':'');
+  document.getElementById('osc_'+ch+'_row').style.display=CHANNELS_ACTIVE[ch]?'':'none';
+}
+
+function updateOscWindow(){
+  OSC_WINDOW=parseInt(document.getElementById('oscWindow').value);
+}
+
+function switchTab(tab){
+  currentTab=tab;
+  ['osc','fft','3d','replay'].forEach(t=>{
+    const el=document.getElementById('panel-'+t);
+    if(el) el.style.display=(t===tab)?'flex':'none';
+    document.getElementById('tab-'+t).className='tab'+(t===tab?' active':'');
+  });
+  if(tab==='3d') requestAnimationFrame(draw3dFull);
+}
+
+function toggleReplay(){
+  if(recording.length===0)return;
+  replayPlaying=!replayPlaying;
+  document.getElementById('replayPlayBtn').innerHTML=replayPlaying?'<i class="ti ti-player-pause"></i>':'<i class="ti ti-player-play"></i>';
+  if(replayPlaying){
+    if(replayIdx>=recording.length) replayIdx=0;
+    replayInterval=setInterval(()=>{
+      if(replayIdx>=recording.length){replayPlaying=false;clearInterval(replayInterval);return}
+      document.getElementById('replaySlider').value=Math.round(replayIdx/recording.length*100);
+      document.getElementById('replayPos').textContent=replayIdx+' / '+recording.length;
+      replayIdx+=5;
+    },50);
+  }else{
+    clearInterval(replayInterval);
+  }
+}
+
+function seekReplay(pct){
+  replayIdx=Math.floor(pct/100*recording.length);
+  document.getElementById('replayPos').textContent=replayIdx+' / '+recording.length;
+}
+
+function buildReplayCanvas(){
+  if(recording.length===0)return;
+  document.getElementById('replayEmpty').style.display='none';
+  const canvas=document.getElementById('replayCanvas');
+  canvas.style.display='block';
+  canvas.width=canvas.offsetWidth||600;canvas.height=200;
+  const ctx=canvas.getContext('2d');
+  const w=canvas.width,h=canvas.height;
+  ctx.fillStyle=isDark?'#1a1a1a':'#f5f5f2';ctx.fillRect(0,0,w,h);
+  ['ax','az'].forEach((k,ki)=>{
+    ctx.beginPath();
+    const col=k==='ax'?'#378add':'#d85a30';
+    ctx.strokeStyle=col;ctx.lineWidth=1.5;
+    for(let i=0;i<recording.length;i++){
+      const x=i/recording.length*w;
+      const v=recording[i][k];
+      const y=h/2-v/2*h/2;
+      i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
+    }
+    ctx.stroke();
+  });
+}
+
+const oscCanvases={};
+function getOscCtx(id){
+  if(!oscCanvases[id]){
+    const c=document.getElementById(id);
+    oscCanvases[id]={c,ctx:c.getContext('2d')};
+  }
+  return oscCanvases[id];
+}
+
+function drawOscilloscopes(){
+  Object.entries(CHANNELS).forEach(([key,cfg])=>{
+    if(!CHANNELS_ACTIVE[key])return;
+    const {c,ctx}=getOscCtx('osc_'+key);
+    const row=document.getElementById('osc_'+key+'_row');
+    if(!row||row.style.display==='none')return;
+    const w=row.offsetWidth||500,h=row.offsetHeight||60;
+    if(c.width!==w||c.height!==h){c.width=w;c.height=h}
+    ctx.clearRect(0,0,w,h);
+
+    const nGrid=5;
+    ctx.strokeStyle=GRID_COLOR;ctx.lineWidth=0.5;
+    for(let i=1;i<nGrid;i++){const y=i/nGrid*h;ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(w,y);ctx.stroke()}
+    ctx.strokeStyle=ZERO_COLOR;ctx.lineWidth=0.8;
+    ctx.beginPath();ctx.moveTo(0,h/2);ctx.lineTo(w,h/2);ctx.stroke();
+
+    ctx.fillStyle=TEXT_COLOR;ctx.font='9px monospace';
+    ctx.fillText('+'+cfg.range+cfg.unit,3,10);
+    ctx.fillText('-'+cfg.range+cfg.unit,3,h-3);
+
+    const data=history[key];
+    const n=Math.min(data.length,OSC_WINDOW);
+    if(n<2)return;
+    const slice=data.slice(data.length-n);
+    ctx.beginPath();ctx.strokeStyle=cfg.color;ctx.lineWidth=1.5;
+    for(let i=0;i<slice.length;i++){
+      const x=i/(slice.length-1)*w;
+      const y=h/2-slice[i]/cfg.range*(h/2)*0.9;
+      i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
+    }
+    ctx.stroke();
+  });
+}
+
+function drawFFT(){
+  if(currentTab!=='fft')return;
+  const canvas=document.getElementById('fftCanvas');
+  const w=canvas.offsetWidth||500,h=canvas.offsetHeight||200;
+  if(canvas.width!==w||canvas.height!==h){canvas.width=w;canvas.height=h}
+  const ctx=canvas.getContext('2d');
+  ctx.clearRect(0,0,w,h);
+
+  const data=history.ax;
+  const n=Math.min(512,data.length);
+  if(n<64)return;
+  const slice=data.slice(data.length-n);
+
+  const re=[...slice,...new Array(n).fill(0)];
+  const im=new Array(n*2).fill(0);
+  simpleFFT(re,im,n);
+
+  const bins=n/2;
+  const maxFreq=50;
+  const freqStep=100/n;
+  const maxBin=Math.floor(maxFreq/freqStep);
+
+  let maxMag=0;
+  const mags=[];
+  for(let i=1;i<Math.min(maxBin,bins);i++){
+    const mag=Math.sqrt(re[i]*re[i]+im[i]*im[i]);
+    mags.push(mag);if(mag>maxMag)maxMag=mag;
+  }
+
+  ctx.fillStyle=isDark?'#1a1a1a':'#f5f5f2';ctx.fillRect(0,0,w,h);
+  ctx.strokeStyle=GRID_COLOR;ctx.lineWidth=0.5;
+  for(let i=1;i<5;i++){const y=i/5*h;ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(w,y);ctx.stroke()}
+  [1,2,5,10,20,50].forEach(f=>{
+    const x=f/maxFreq*w;
+    ctx.strokeStyle=GRID_COLOR;ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,h);ctx.stroke();
+    ctx.fillStyle=TEXT_COLOR;ctx.font='9px monospace';ctx.fillText(f+'Hz',x+2,h-4);
+  });
+
+  ctx.beginPath();ctx.strokeStyle='#378add';ctx.lineWidth=2;
+  mags.forEach((m,i)=>{
+    const x=i/mags.length*w;
+    const y=h-(m/(maxMag+1e-9))*(h-10);
+    i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
+  });
+  ctx.stroke();
+  ctx.fillStyle='rgba(55,138,221,0.15)';ctx.lineTo(w,h);ctx.lineTo(0,h);ctx.closePath();ctx.fill();
+
+  ctx.fillStyle=TEXT_COLOR;ctx.font='10px monospace';ctx.fillText('Frequency spectrum (ax)',8,14);
+}
+
+function simpleFFT(re,im,n){
+  for(let i=0,j=0;i<n;i++){
+    if(i<j){let t=re[i];re[i]=re[j];re[j]=t}
+    let m=n>>1;for(;j&m;m>>=1)j^=m;j^=m;
+  }
+  for(let s=2;s<=n;s<<=1){
+    const angle=-2*Math.PI/s;
+    const wr=Math.cos(angle),wi=Math.sin(angle);
+    for(let k=0;k<n;k+=s){
+      let cr=1,ci=0;
+      for(let j=0;j<s/2;j++){
+        const tr=cr*re[k+j+s/2]-ci*im[k+j+s/2];
+        const ti=cr*im[k+j+s/2]+ci*re[k+j+s/2];
+        re[k+j+s/2]=re[k+j]-tr;im[k+j+s/2]=im[k+j]-ti;
+        re[k+j]+=tr;im[k+j]+=ti;
+        const ncr=cr*wr-ci*wi;ci=cr*wi+ci*wr;cr=ncr;
+      }
+    }
+  }
+}
+
+function drawCubeSmall(){
+  const canvas=document.getElementById('cubeSmall');
+  const ctx=canvas.getContext('2d');
+  const w=canvas.width,h=canvas.height;
+  ctx.clearRect(0,0,w,h);
+
+  cubeAngles.x+=(targetAngles.x-cubeAngles.x)*0.08;
+  cubeAngles.y+=(targetAngles.y-cubeAngles.y)*0.08;
+  cubeAngles.z+=(targetAngles.z-cubeAngles.z)*0.08;
+
+  const cx=w/2,cy=h/2,size=52;
+  const rx=cubeAngles.x,ry=cubeAngles.y,rz=cubeAngles.z;
+
+  function rotVert(v){
+    let [x,y,z]=v;
+    let y2=y*Math.cos(rx)-z*Math.sin(rx),z2=y*Math.sin(rx)+z*Math.cos(rx);
+    y=y2;z=z2;
+    let x2=x*Math.cos(ry)+z2*Math.sin(ry),z3=-x*Math.sin(ry)+z2*Math.cos(ry);
+    x=x2;z=z3;
+    let x3=x2*Math.cos(rz)-y*Math.sin(rz),y3=x2*Math.sin(rz)+y*Math.cos(rz);
+    const sc=280/(280+z);
+    return[cx+x3*size*sc,cy-y3*size*sc,z];
+  }
+
+  const verts=[[-1,-1,-1],[1,-1,-1],[1,1,-1],[-1,1,-1],[-1,-1,1],[1,-1,1],[1,1,1],[-1,1,1]];
+  const faces=[[0,1,2,3],[4,5,6,7],[0,1,5,4],[2,3,7,6],[0,3,7,4],[1,2,6,5]];
+  const faceColors=isDark?
+    ['#1d4670','#1d3b30','#5a2a1a','#2d1f60','#5a1a30','#4a3010']:
+    ['#b5d4f4','#9fe1cb','#f5c4b3','#cecbf6','#f4c0d1','#fac775'];
+  const labels=['X','X','Z','Z','Y','Y'];
+
+  const projected=verts.map(v=>rotVert(v));
+  const facesWithZ=faces.map((f,i)=>{
+    const z=f.reduce((s,vi)=>s+projected[vi][2],0)/4;
+    return{f,i,z};
+  }).sort((a,b)=>a.z-b.z);
+
+  facesWithZ.forEach(({f,i})=>{
+    const pts=f.map(vi=>projected[vi]);
+    ctx.beginPath();
+    ctx.moveTo(pts[0][0],pts[0][1]);
+    pts.forEach(p=>ctx.lineTo(p[0],p[1]));
+    ctx.closePath();
+    ctx.fillStyle=faceColors[i];ctx.fill();
+    ctx.strokeStyle=isDark?'rgba(255,255,255,.15)':'rgba(0,0,0,.2)';ctx.lineWidth=1;ctx.stroke();
+    const mc=pts.reduce((a,p)=>[a[0]+p[0]/4,a[1]+p[1]/4],[0,0]);
+    ctx.fillStyle=isDark?'rgba(255,255,255,.6)':'rgba(0,0,0,.5)';
+    ctx.font='bold 12px system-ui';ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillText(labels[i],mc[0],mc[1]);
+  });
+
+  const axLen=65;
+  [['X','#e24b4a',[1,0,0]],['Y','#1d9e75',[0,1,0]],['Z','#378add',[0,0,1]]].forEach(([l,c,d])=>{
+    const[ex,ey]=rotVert(d.map(v=>v*1.5));
+    ctx.beginPath();ctx.strokeStyle=c;ctx.lineWidth=1.5;
+    ctx.moveTo(cx,cy);ctx.lineTo(ex,ey);ctx.stroke();
+    ctx.fillStyle=c;ctx.font='bold 10px system-ui';ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillText(l,ex,ey-8);
+  });
+}
+
+function draw3dFull(){
+  if(currentTab!=='3d')return;
+  const canvas=document.getElementById('cube3d');
+  const panel=document.getElementById('panel-3d');
+  canvas.width=panel.offsetWidth||500;canvas.height=panel.offsetHeight-20||400;
+  drawCubeSmall();
+  const ctx=canvas.getContext('2d');
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  requestAnimationFrame(draw3dFull);
+}
+
+let frameN=0;
+function renderLoop(){
+  frameN++;
+  if(frameN%2===0) drawOscilloscopes();
+  if(currentTab==='fft'&&frameN%5===0) drawFFT();
+  drawCubeSmall();
+  requestAnimationFrame(renderLoop);
+}
+
+document.getElementById('panel-osc').style.display='flex';
+['fft','3d','replay'].forEach(t=>{
+  const el=document.getElementById('panel-'+t);
+  if(el)el.style.display='none';
+});
+
+uptimeStart=Date.now();
+startSim();
+renderLoop();
+</script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+</body>
+</html>
