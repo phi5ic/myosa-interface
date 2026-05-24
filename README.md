@@ -2,7 +2,7 @@
 publishDate: 2026-05-25T00:00:00Z
 title: StabiSense – A Self-Calibrating IMU-Based Micro-Scale Stabilization System with Real-Time Adaptive Control
 excerpt: A real-time seismic monitoring system using the ESP32 MYOSA kit that classifies motion events into four severity levels using an on-device TinyML model, with a browser-based telemetry dashboard for live analysis, event replay, and data export.
-image: StabiSense/full-setup.jpeg
+image: full-setup.jpeg
 tags:
   - ESP32
   - TinyML
@@ -43,24 +43,24 @@ The model classifies incoming motion into one of four states in real time. A loc
 ### **Images**
 
 <p align="center">
-  <img src="/assets/images/StabiSense/full-setup.jpeg" width="800"><br/>
+  <img src="full-setup.jpeg" width="800"><br/>
   <i>Complete system in operation — MYOSA sensor kit connected over USB, browser dashboard streaming live accelerometer waveforms from the ESP32 TinyML inference pipeline</i>
 </p>
 
 <p align="center">
-  <img src="/assets/images/StabiSense/hardware-closeup.jpeg" width="800"><br/>
+  <img src="hardware-closeup.jpeg" width="800"><br/>
   <i>MYOSA ESP32 board with MPU6050 (AccelAndGyro), BMP180 (BarometricPressure), APDS9960 (gesture), and SSD1306 OLED mounted in the sensor kit enclosure</i>
 </p>
 
 <p align="center">
-  <img src="/assets/images/StabiSense/dashboard-live-seismic.jpeg" width="800"><br/>
+  <img src="dashboard-live-seismic.jpeg" width="800"><br/>
   <i>Browser telemetry dashboard showing a live seismic event — three-channel oscilloscope traces (ax, ay, az) with AI classification panel and real-time sensor values</i>
 </p>
 
 ### **Videos**
 
 <video controls width="100%">
-  <source src="/demo_YP5JgmB8.mp4" type="video/mp4">
+  <source src="demo_YP5JgmB8.mp4" type="video/mp4">
 </video>
 
 ---
