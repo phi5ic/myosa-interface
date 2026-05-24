@@ -71,7 +71,7 @@ canvas.cube-canvas{display:block}
 <div class="app">
   <div class="topbar">
     <div class="status-dot" id="statusDot"></div>
-    <span class="topbar-title">IMU Telemetry Dashboard — MPU6050</span>
+    <span class="topbar-title">Seismic Monitor — MYOSA ESP32</span>
     <span class="status-text" id="statusText">Disconnected</span>
     <select id="sourceSelect" onchange="handleSourceChange()">
       <option value="sim">Simulation</option>
@@ -99,6 +99,10 @@ canvas.cube-canvas{display:block}
         <div class="metric-row"><span class="metric-label">gz (°/s)</span><span class="metric-val gz" id="v_gz">0.000</span></div>
         <div style="margin-top:8px;border-top:0.5px solid var(--color-border-tertiary,rgba(0,0,0,.1));padding-top:8px">
           <div class="metric-row"><span class="metric-label">|a| (g)</span><span class="metric-val" id="v_mag">1.000</span></div>
+          <div class="metric-row"><span class="metric-label">Linear acc (g)</span><span class="metric-val" id="v_linacc">0.000</span></div>
+          <div class="metric-row"><span class="metric-label">Gyro mag (°/s)</span><span class="metric-val" id="v_gyromag">0.0</span></div>
+          <div class="metric-row"><span class="metric-label">Motion score</span><span class="metric-val" id="v_motion">0.00</span></div>
+          <div class="metric-row"><span class="metric-label">Tilt mag (°)</span><span class="metric-val" id="v_tiltmag">0.0</span></div>
           <div class="metric-row"><span class="metric-label">Temp (°C)</span><span class="metric-val" id="v_temp">25.0</span></div>
           <div class="metric-row"><span class="metric-label">Sample/s</span><span class="metric-val" id="v_rate">100</span></div>
           <div class="metric-row"><span class="metric-label">Uptime</span><span class="metric-val" id="v_uptime">0s</span></div>
@@ -106,20 +110,35 @@ canvas.cube-canvas{display:block}
       </div>
 
       <div class="section">
-        <div class="section-title">Detection</div>
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
-          <span style="font-size:12px">Seismic</span>
+        <div class="section-title">AI Classification</div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+          <span style="font-size:13px;font-weight:600;font-family:monospace" id="v_classLabel">IDLE</span>
           <span class="alert-badge alert-ok" id="seismicBadge">OK</span>
         </div>
-        <div class="seismic-bar"><div class="seismic-fill" id="seismicFill" style="width:0%;background:#639922"></div></div>
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-top:8px;margin-bottom:4px">
-          <span style="font-size:12px">Phase</span>
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
+          <span style="font-size:10px;color:var(--color-text-secondary);width:56px">Confidence</span>
+          <div class="bar-bg" style="flex:1"><div class="bar-fill" id="confBar" style="background:#639922;width:0%"></div></div>
+          <span style="font-size:11px;font-family:monospace;width:34px;text-align:right" id="v_conf">0%</span>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+          <span style="font-size:12px">Source</span>
           <span class="phase-tag" id="phaseBadge" style="background:var(--color-background-secondary);color:var(--color-text-secondary)">—</span>
         </div>
-        <div style="margin-top:8px">
-          <div class="metric-row"><span class="metric-label">PGA (g)</span><span class="metric-val" id="v_pga">0.000</span></div>
-          <div class="metric-row"><span class="metric-label">Alert level</span><span class="metric-val" id="v_alert">None</span></div>
+        <div class="metric-row"><span class="metric-label">AI ready</span><span class="metric-val" id="v_aiready">—</span></div>
+        <div class="metric-row"><span class="metric-label">PGA (g)</span><span class="metric-val" id="v_pga">0.000</span></div>
+        <div class="metric-row"><span class="metric-label">Alert level</span><span class="metric-val" id="v_alert">None</span></div>
+        <div style="margin-top:8px;padding-top:8px;border-top:0.5px solid var(--color-border-tertiary,rgba(0,0,0,.1))">
+          <div class="section-title" style="margin-bottom:6px">Class likelihood</div>
+          <div class="bar-row"><span style="width:64px;font-size:10px;color:var(--color-text-secondary)">IDLE</span><div class="bar-bg"><div class="bar-fill" id="cl_idle" style="background:#639922;width:100%"></div></div></div>
+          <div class="bar-row"><span style="width:64px;font-size:10px;color:var(--color-text-secondary)">TREMOR</span><div class="bar-bg"><div class="bar-fill" id="cl_tremor" style="background:#ba7517;width:0%"></div></div></div>
+          <div class="bar-row"><span style="width:64px;font-size:10px;color:var(--color-text-secondary)">LANDSLIDE</span><div class="bar-bg"><div class="bar-fill" id="cl_land" style="background:#d85a30;width:0%"></div></div></div>
+          <div class="bar-row"><span style="width:64px;font-size:10px;color:var(--color-text-secondary)">SEISMIC</span><div class="bar-bg"><div class="bar-fill" id="cl_seis" style="background:#e24b4a;width:0%"></div></div></div>
         </div>
+      </div>
+
+      <div class="section">
+        <div class="section-title">Seismic intensity</div>
+        <div class="seismic-bar" style="height:5px"><div class="seismic-fill" id="seismicFill" style="width:0%;background:#639922"></div></div>
       </div>
 
       <div class="section" style="flex:1">
@@ -369,14 +388,33 @@ function startSim(){
     simT+=0.01;
     const quake = simT>30&&simT<55;
     const qScale = quake?Math.sin((simT-30)*0.5)*Math.min((simT-30)*0.1,1.0)*0.4:0;
+    const ax=(Math.sin(simT*2.1)*0.012+Math.random()*0.006-0.003+qScale*(Math.sin(simT*8.3)+Math.random()*.3))*calibScales.ax-calibOffsets.ax;
+    const ay=(Math.cos(simT*1.7)*0.008+Math.random()*0.006-0.003+qScale*(Math.cos(simT*9.1)+Math.random()*.3))*calibScales.ay-calibOffsets.ay;
+    const az=(1.0+Math.sin(simT*0.3)*0.002+Math.random()*0.003+qScale*0.3)*calibScales.az-calibOffsets.az;
+    const gxv=Math.sin(simT*1.1)*0.8+Math.random()*0.5-0.25+qScale*15*(Math.sin(simT*6));
+    const gyv=Math.cos(simT*0.9)*0.6+Math.random()*0.5-0.25+qScale*12*(Math.cos(simT*7));
+    const gzv=Math.sin(simT*0.4)*0.3+Math.random()*0.3-0.15+qScale*8;
+    const linAcc=Math.sqrt(ax*ax+ay*ay+(az-1)*(az-1));
+    const gyroMag=Math.sqrt(gxv*gxv+gyv*gyv+gzv*gzv);
+    const motionScore=Math.min(1,(linAcc/0.5*0.65+gyroMag/90*0.35));
+    // Simulate AI classification matching quake phase
+    let aiClass=0; let aiConf=0.92;
+    if(quake){
+      const phase=simT-30;
+      if(phase<10){aiClass=1;aiConf=0.60+Math.random()*0.2;}
+      else if(phase<18){aiClass=3;aiConf=0.75+Math.random()*0.2;}
+      else{aiClass=2;aiConf=0.65+Math.random()*0.15;}
+    }
     const sample={
-      ax:(Math.sin(simT*2.1)*0.012+Math.random()*0.006-0.003+qScale*(Math.sin(simT*8.3)+Math.random()*.3))*calibScales.ax-calibOffsets.ax,
-      ay:(Math.cos(simT*1.7)*0.008+Math.random()*0.006-0.003+qScale*(Math.cos(simT*9.1)+Math.random()*.3))*calibScales.ay-calibOffsets.ay,
-      az:(1.0+Math.sin(simT*0.3)*0.002+Math.random()*0.003+qScale*0.3)*calibScales.az-calibOffsets.az,
-      gx:Math.sin(simT*1.1)*0.8+Math.random()*0.5-0.25+qScale*15*(Math.sin(simT*6)),
-      gy:Math.cos(simT*0.9)*0.6+Math.random()*0.5-0.25+qScale*12*(Math.cos(simT*7)),
-      gz:Math.sin(simT*0.4)*0.3+Math.random()*0.3-0.15+qScale*8,
+      ax,ay,az,gx:gxv,gy:gyv,gz:gzv,
+      roll:Math.atan2(ay,az)*180/Math.PI,
+      pitch:Math.atan2(-ax,Math.sqrt(ay*ay+az*az))*180/Math.PI,
       temp:25+Math.sin(simT*0.01)*0.5,
+      linearAcc:linAcc, gyroMag, motionScore,
+      tiltMag:Math.sqrt(Math.pow(Math.atan2(ay,az)*180/Math.PI,2)+Math.pow(Math.atan2(-ax,Math.sqrt(ay*ay+az*az))*180/Math.PI,2)),
+      aiClass, aiConfidence:aiConf,
+      detectionSource: aiClass>0?'MODEL':'WARM',
+      aiReady:true,
     };
     ingestSample(sample);
   },10);
@@ -398,36 +436,122 @@ async function connectSerial(){
       buf+=value;
       const lines=buf.split('\n');
       buf=lines.pop();
-      for(const line of lines){
-        const parts=line.trim().split(',');
-        if(parts.length>=7){
-          ingestSample({ax:+parts[1],ay:+parts[2],az:+parts[3],gx:+parts[4],gy:+parts[5],gz:+parts[6]});
-        }
-      }
+      for(const line of lines) parseLine(line.trim());
     }
   }catch(e){if(e.name!=='NotFoundError')alert('Serial error: '+e.message)}
   setConnected(false);
+}
+
+// ── Unified line parser — handles both firmware serial formats ────────────────
+//
+// FORMAT A — firmware main.cpp Serial.print loop (space-separated key:value):
+//   R:0.0 P:0.0 Ax:0.00 Ay:0.00 Az:1.00 LinA:0.000 GMag:0.0 Motion:0.00
+//   Class:IDLE Conf:0% Src:WARM Pg:1 Pause:N
+//
+// FORMAT B — LOG mode CSV (sent when 'L' typed in serial monitor):
+//   ts_ms,ax,ay,az,gx,gy,gz,accelVib,gyroVib,stab,wafer,state
+//   (header lines start with #, skip them)
+//
+// FORMAT C — WASTP BLE CSV (from sendTelemetry()):
+//   state,pitch,roll,accelVib,gyroVib,stab,wafer,temp,pressure,compX,compY
+//
+function parseLine(line){
+  if(!line || line.startsWith('#')) return;
+
+  // FORMAT A — key:value style (main loop Serial.print output)
+  if(line.includes('R:') && line.includes('Ax:')){
+    const kv={};
+    line.split(/\s+/).forEach(tok=>{
+      const i=tok.indexOf(':');
+      if(i>0) kv[tok.slice(0,i)]=tok.slice(i+1);
+    });
+    const s={
+      ax:parseFloat(kv['Ax'])||0,
+      ay:parseFloat(kv['Ay'])||0,
+      az:parseFloat(kv['Az'])||1,
+      gx:0, gy:0, gz:0,    // not in this format
+      roll:parseFloat(kv['R'])||0,
+      pitch:parseFloat(kv['P'])||0,
+      linearAcc:parseFloat(kv['LinA'])||0,
+      gyroMag:parseFloat(kv['GMag'])||0,
+      motionScore:parseFloat(kv['Motion'])||0,
+      aiClass:classNameToInt(kv['Class']||'IDLE'),
+      aiConfidence:parseFloat((kv['Conf']||'0').replace('%',''))/100,
+      detectionSource:kv['Src']||'WARM',
+      telemetryPaused:kv['Pause']==='Y',
+    };
+    ingestSample(s);
+    return;
+  }
+
+  // FORMAT B — LOG CSV: ts,ax,ay,az,gx,gy,gz,accelVib,gyroVib,stab,wafer,state
+  const p=line.split(',');
+  if(p.length===12 && !isNaN(+p[0]) && !isNaN(+p[1])){
+    ingestSample({
+      ax:+p[1], ay:+p[2], az:+p[3],
+      gx:+p[4], gy:+p[5], gz:+p[6],
+      linearAcc:+p[7], gyroMag:+p[8], motionScore:+p[9]/100,
+      aiClass:classNameToInt(p[11]?.trim()), aiConfidence:0, detectionSource:'LOG',
+    });
+    return;
+  }
+
+  // FORMAT C — WASTP BLE CSV: state,pitch,roll,accelVib,gyroVib,stab,wafer,temp,pressure,compX,compY
+  if(p.length===11 && isNaN(+p[0]) && !isNaN(+p[1])){
+    const vib=+p[3]; const mag=Math.sqrt(vib*vib+1);
+    ingestSample({
+      ax:0, ay:0, az:1,
+      gx:0, gy:0, gz:0,
+      pitch:+p[1], roll:+p[2],
+      linearAcc:vib, gyroMag:+p[4], motionScore:+p[5]/100,
+      aiClass:classNameToInt(p[0]), aiConfidence:+p[5]/100,
+      detectionSource:'BLE', temp:+p[7],
+    });
+    return;
+  }
+
+  // Fallback legacy: ts,ax,ay,az,gx,gy,gz (≥7 numeric fields)
+  if(p.length>=7 && !isNaN(+p[1])){
+    ingestSample({ax:+p[1],ay:+p[2],az:+p[3],gx:+p[4],gy:+p[5],gz:+p[6]});
+  }
+}
+
+function classNameToInt(name){
+  switch((name||'').toUpperCase()){
+    case 'TREMOR':    return 1;
+    case 'LANDSLIDE': return 2;
+    case 'SEISMIC':   return 3;
+    default:          return 0;
+  }
 }
 
 async function connectBLE(){
   if(!('bluetooth' in navigator)){alert('Web Bluetooth not supported in this browser. Use Chrome/Edge.');return}
   try{
     bleDevice=await navigator.bluetooth.requestDevice({
-      filters:[{namePrefix:'ESP32'},{namePrefix:'IMU'},{namePrefix:'MPU'}],
-      optionalServices:['6e400001-b5a3-f393-e0a9-e50e24dcca9e']
+      // WASTP firmware advertises name "WASTP"
+      filters:[{name:'WASTP'},{namePrefix:'WASTP'},{namePrefix:'ESP32'},{namePrefix:'IMU'}],
+      optionalServices:[
+        '4fafc201-1fb5-459e-8fcc-c5c9c331914b',  // WASTP SERVICE_UUID
+        '6e400001-b5a3-f393-e0a9-e50e24dcca9e'   // fallback NUS
+      ]
     });
     const server=await bleDevice.gatt.connect();
     setConnected(true);
-    const service=await server.getPrimaryService('6e400001-b5a3-f393-e0a9-e50e24dcca9e');
-    const char=await service.getCharacteristic('6e400003-b5a3-f393-e0a9-e50e24dcca9e');
+    // Try WASTP service first, fall back to NUS
+    let char=null;
+    try{
+      const svc=await server.getPrimaryService('4fafc201-1fb5-459e-8fcc-c5c9c331914b');
+      char=await svc.getCharacteristic('beb5483e-36e1-4688-b7f5-ea07361b26a8');
+    }catch(e){
+      const svc=await server.getPrimaryService('6e400001-b5a3-f393-e0a9-e50e24dcca9e');
+      char=await svc.getCharacteristic('6e400003-b5a3-f393-e0a9-e50e24dcca9e');
+    }
     let buf='';
     char.addEventListener('characteristicvaluechanged',e=>{
       buf+=new TextDecoder().decode(e.target.value);
       const lines=buf.split('\n');buf=lines.pop();
-      for(const line of lines){
-        const p=line.trim().split(',');
-        if(p.length>=7) ingestSample({ax:+p[1],ay:+p[2],az:+p[3],gx:+p[4],gy:+p[5],gz:+p[6]});
-      }
+      for(const line of lines) parseLine(line.trim());
     });
     await char.startNotifications();
     bleDevice.addEventListener('gattserverdisconnected',()=>setConnected(false));
@@ -451,7 +575,7 @@ function ingestSample(s){
   if(isCalibrating) calibSamples.push(s);
 
   updateMetrics(s,now);
-  updateSeismic(s);
+  updateAIClassification(s);
   updateCubeTarget(s);
 }
 
@@ -462,17 +586,23 @@ function updateMetrics(s,now){
   document.getElementById('v_gx').textContent=s.gx?.toFixed(3)??'—';
   document.getElementById('v_gy').textContent=s.gy?.toFixed(3)??'—';
   document.getElementById('v_gz').textContent=s.gz?.toFixed(3)??'—';
-  if(s.temp!=null) document.getElementById('v_temp').textContent=s.temp.toFixed(1);
+  if(s.temp!=null||s.tempC!=null) document.getElementById('v_temp').textContent=(s.tempC??s.temp??0).toFixed(1);
   const mag=Math.sqrt(s.ax*s.ax+s.ay*s.ay+s.az*s.az);
   document.getElementById('v_mag').textContent=mag.toFixed(4);
+  // Firmware-specific derived fields
+  if(s.linearAcc!=null) document.getElementById('v_linacc').textContent=s.linearAcc.toFixed(3);
+  if(s.gyroMag!=null)   document.getElementById('v_gyromag').textContent=s.gyroMag.toFixed(1);
+  if(s.motionScore!=null) document.getElementById('v_motion').textContent=s.motionScore.toFixed(2);
+  if(s.tiltMag!=null)   document.getElementById('v_tiltmag').textContent=s.tiltMag.toFixed(1);
   const uptimeSec=Math.floor((now-uptimeStart)/1000);
   document.getElementById('v_uptime').textContent=uptimeSec+'s';
   if(sampleRateBuffer.length>10){
     const dt=(now-sampleRateBuffer[0])/(sampleRateBuffer.length-1);
     document.getElementById('v_rate').textContent=dt>0?Math.round(1000/dt):'—';
   }
-  const roll=Math.atan2(s.ay,s.az)*180/Math.PI;
-  const pitch=Math.atan2(-s.ax,Math.sqrt(s.ay*s.ay+s.az*s.az))*180/Math.PI;
+  // Use firmware roll/pitch if available, else compute from accel
+  const roll  = s.roll  != null ? s.roll  : Math.atan2(s.ay,s.az)*180/Math.PI;
+  const pitch = s.pitch != null ? s.pitch : Math.atan2(-s.ax,Math.sqrt(s.ay*s.ay+s.az*s.az))*180/Math.PI;
   document.getElementById('v_roll').textContent=roll.toFixed(1)+'°';
   document.getElementById('v_pitch').textContent=pitch.toFixed(1)+'°';
   document.getElementById('v_yaw').textContent='—';
@@ -496,30 +626,73 @@ function updateMetrics(s,now){
   }
 }
 
-function updateSeismic(s){
+// ── updateAIClassification ────────────────────────────────────────────────────
+// Uses firmware aiClass (0=IDLE,1=TREMOR,2=LANDSLIDE,3=SEISMIC) + aiConfidence
+// when available; falls back to PGA-based heuristic for simulation/legacy data.
+function updateAIClassification(s){
   const mag=Math.sqrt(s.ax*s.ax+s.ay*s.ay+(s.az-1)*(s.az-1));
   pgaWindow.push(mag); if(pgaWindow.length>500) pgaWindow.shift();
   const pga=Math.max(...pgaWindow);
   document.getElementById('v_pga').textContent=pga.toFixed(4);
+
+  // Seismic intensity bar (PGA-based, always updated)
   const pct=Math.min(100,pga/0.5*100);
-  const fill=document.getElementById('seismicFill');
-  fill.style.width=pct+'%';
-  let badge=document.getElementById('seismicBadge');
-  let alertEl=document.getElementById('v_alert');
-  let phaseBadge=document.getElementById('phaseBadge');
-  if(pga<0.01){
-    badge.className='alert-badge alert-ok';badge.textContent='OK';
-    alertEl.textContent='None';fill.style.background='#639922';
-    phaseBadge.textContent='—';phaseBadge.style.background='var(--color-background-secondary)';phaseBadge.style.color='var(--color-text-secondary)';
-  }else if(pga<0.05){
-    badge.className='alert-badge alert-warn';badge.textContent='MINOR';
-    alertEl.textContent='Minor';fill.style.background='#ba7517';
-    phaseBadge.textContent='P-wave';phaseBadge.style.background='#faeeda';phaseBadge.style.color='#854f0b';
-  }else{
-    badge.className='alert-badge alert-danger';badge.textContent='ALERT';
-    alertEl.textContent='STRONG';fill.style.background='#e24b4a';
-    phaseBadge.textContent='S-wave';phaseBadge.style.background='#fcebeb';phaseBadge.style.color='#a32d2d';
-  }
+  document.getElementById('seismicFill').style.width=pct+'%';
+
+  // Determine class + confidence — use firmware values if present
+  let cls  = s.aiClass      != null ? s.aiClass      : (pga>0.05?2:pga>0.01?1:0);
+  let conf = s.aiConfidence != null ? s.aiConfidence  : Math.min(1, pga/0.05);
+  let src  = s.detectionSource || '—';
+
+  // Class label + colours
+  const CLASS_META=[
+    {label:'IDLE',      badge:'alert-ok',     badgeText:'OK',       alert:'None',    fill:'#639922', sfill:'#639922'},
+    {label:'TREMOR',    badge:'alert-warn',   badgeText:'TREMOR',   alert:'Minor',   fill:'#ba7517', sfill:'#ba7517'},
+    {label:'LANDSLIDE', badge:'alert-danger', badgeText:'LANDSLIDE',alert:'MODERATE',fill:'#d85a30', sfill:'#d85a30'},
+    {label:'SEISMIC',   badge:'alert-danger', badgeText:'SEISMIC',  alert:'STRONG',  fill:'#e24b4a', sfill:'#e24b4a'},
+  ];
+  const meta=CLASS_META[cls]||CLASS_META[0];
+
+  document.getElementById('v_classLabel').textContent=meta.label;
+  document.getElementById('v_classLabel').style.color=meta.sfill;
+
+  const badge=document.getElementById('seismicBadge');
+  badge.className='alert-badge '+meta.badge;
+  badge.textContent=meta.badgeText;
+
+  document.getElementById('v_alert').textContent=meta.alert;
+  document.getElementById('seismicFill').style.background=meta.sfill;
+
+  // Confidence bar
+  const confPct=(conf*100).toFixed(0);
+  document.getElementById('confBar').style.width=confPct+'%';
+  document.getElementById('confBar').style.background=meta.sfill;
+  document.getElementById('v_conf').textContent=confPct+'%';
+
+  // AI ready
+  document.getElementById('v_aiready').textContent = s.aiReady!=null ? (s.aiReady?'YES':'NO') : '—';
+
+  // Source badge
+  const pb=document.getElementById('phaseBadge');
+  const srcMeta={
+    MODEL:   {bg:'#e6f1fb',col:'#185fa5'},
+    RULE:    {bg:'#faeeda',col:'#854f0b'},
+    OVERRIDE:{bg:'#fcebeb',col:'#a32d2d'},
+    WARM:    {bg:'#f5f5f2',col:'#666'},
+    BLE:     {bg:'#e6f1fb',col:'#185fa5'},
+    LOG:     {bg:'#f5f5f2',col:'#666'},
+  }[src.toUpperCase()]||{bg:'#f5f5f2',col:'#666'};
+  pb.textContent=src;
+  pb.style.background=srcMeta.bg;
+  pb.style.color=srcMeta.col;
+
+  // Class likelihood mini-bars: set active class to confidence, others get inverse share
+  const ids=['cl_idle','cl_tremor','cl_land','cl_seis'];
+  const remaining=(1-conf)/3;
+  ids.forEach((id,i)=>{
+    const pct2=i===cls?conf*100:remaining*100;
+    document.getElementById(id).style.width=Math.max(1,pct2).toFixed(1)+'%';
+  });
 }
 
 function updateCubeTarget(s){
@@ -562,9 +735,20 @@ function clearRecording(){
 
 function exportData(){
   if(recording.length===0){alert('No recording to export.');return}
-  const header='timestamp_ms,ax,ay,az,gx,gy,gz\n';
-  const rows=recording.map(r=>`${r.t},${r.ax.toFixed(6)},${r.ay.toFixed(6)},${r.az.toFixed(6)},${(r.gx??0).toFixed(4)},${(r.gy??0).toFixed(4)},${(r.gz??0).toFixed(4)}`).join('\n');
-  download('imu_recording.csv',header+rows,'text/csv');
+  const header='timestamp_ms,ax,ay,az,gx,gy,gz,roll,pitch,linearAcc,gyroMag,motionScore,aiClass,aiConfidence,detectionSource,temp\n';
+  const rows=recording.map(r=>[
+    r.t,
+    (r.ax??0).toFixed(6),(r.ay??0).toFixed(6),(r.az??0).toFixed(6),
+    (r.gx??0).toFixed(4),(r.gy??0).toFixed(4),(r.gz??0).toFixed(4),
+    (r.roll??0).toFixed(2),(r.pitch??0).toFixed(2),
+    (r.linearAcc??0).toFixed(4),(r.gyroMag??0).toFixed(3),
+    (r.motionScore??0).toFixed(4),
+    r.aiClass??0,
+    (r.aiConfidence??0).toFixed(3),
+    r.detectionSource??'',
+    (r.temp??r.tempC??0).toFixed(1),
+  ].join(',')).join('\n');
+  download('seismic_recording.csv',header+rows,'text/csv');
 }
 
 function exportJSON(){
