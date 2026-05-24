@@ -1,14 +1,7 @@
+# StabiSense – A Self-Calibrating IMU-Based Micro-Scale Stabilization System with Real-Time Adaptive Control
+
 ---
 publishDate: 2026-05-25T00:00:00Z
-title: StabiSense – A Self-Calibrating IMU-Based Micro-Scale Stabilization System with Real-Time Adaptive Control
-excerpt: A real-time seismic monitoring system using the ESP32 MYOSA kit that classifies motion events into four severity levels using an on-device TinyML model, with a browser-based telemetry dashboard for live analysis, event replay, and data export.
-image: full-setup.jpeg
-tags:
-  - ESP32
-  - TinyML
-  - Seismic
-  - MYOSA
-  - IMU
 ---
 
 > An embedded AI system that detects tremors, landslides, and seismic shocks in real time — displayed locally on an OLED and remotely through a browser telemetry dashboard.
