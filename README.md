@@ -44,17 +44,17 @@ The model classifies incoming motion into one of four states in real time. A loc
 ### **Images**
 
 <p align="center">
-  <img src="/assets/images/seismic-monitor/hardware-closeup.jpg" width="800"><br/>
+  <img src="/hardware-closeup.jpg" width="800"><br/>
   <i>MYOSA ESP32 board with MPU6050 (AccelAndGyro), BMP180 (BarometricPressure), APDS9960 (gesture), and SSD1306 OLED mounted in the sensor kit enclosure — connected via USB to the host laptop</i>
 </p>
 
 <p align="center">
-  <img src="/assets/images/seismic-monitor/dashboard-live-seismic.jpg" width="800"><br/>
+  <img src="/dashboard-live-seismic.jpg" width="800"><br/>
   <i>Browser telemetry dashboard showing a live seismic event — three-channel oscilloscope traces (ax, ay, az) with clearly visible waveform bursts, AI classification panel, and real-time sensor values</i>
 </p>
 
 <p align="center">
-  <img src="/assets/images/seismic-monitor/full-setup.jpg" width="800"><br/>
+  <img src="/seismic-monitor/full-setup.jpg" width="800"><br/>
   <i>Complete system in operation — MYOSA sensor kit connected over USB, browser dashboard streaming live accelerometer waveforms from the ESP32 TinyML inference pipeline</i>
 </p>
 
